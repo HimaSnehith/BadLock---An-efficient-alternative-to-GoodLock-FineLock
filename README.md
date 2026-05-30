@@ -10,14 +10,14 @@ An alternative, user-friendly client for managing Samsung Good Lock modules, bui
 
 </div>
 
-✨ Features
+Features
 Smart Update Checker: Reliably checks for new versions of your installed modules using the official APKMirror RSS feed with a robust HTML fallback.
 
 Instant Loading: App loads instantly using cached data while refreshing in the background.
 
 Automatic Refresh: Automatically checks for newly installed apps when you return to the app.
 
-Modern UI: A clean, futuristic interface designed for one-handed use, with a beautiful dark theme.
+Modern UI: A clean, Material You interface designed for one-handed use with an elegant dark theme.
 
 Performance First: Optimized for a buttery-smooth 120Hz scrolling experience.
 
@@ -25,7 +25,9 @@ Updates Hub: A dedicated tab that clearly lists all modules with available updat
 
 App Info Shortcut: A one-tap shortcut to the Android App Info screen for easy management of installed modules.
 
-📸 Screenshots
+Battery Tracker: Monitor power consumption of your installed modules at a glance.
+
+Screenshots
 <div align="center">
 
 Main 
@@ -45,12 +47,12 @@ Updates Tab
 
 </div>
 
-🚀 Download
+Download
 Get the latest version of Badlock from the Releases page.
 
 
 
-🛠️ Built With
+Built With
 Kotlin - Official language for Android development.
 
 Jetpack Compose - Modern toolkit for building native Android UI.
@@ -62,7 +64,7 @@ Special Thanks and Original application holders
 Samsung Electronics 
 Apk Mirror
 
-⚠️ Disclaimer
+Disclaimer
 This application, Badlock, is an independent, fan-made project and is not affiliated with, endorsed, or sponsored by Samsung or APKMirror in any way.
 
 All Good Lock module names, icons, and related trademarks are the property of Samsung Electronics Co., Ltd.
@@ -71,7 +73,7 @@ The application version data is retrieved from APKMirror.com. All credit for pro
 
 This app is provided for educational and experimental purposes. It does not host or distribute any APK files. All download links redirect to the official APKMirror website.
 
-📄 License
+License
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 Buy Me a Coffee
