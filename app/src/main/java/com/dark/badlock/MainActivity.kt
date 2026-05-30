@@ -3,9 +3,11 @@ package com.dark.badlock
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -16,12 +18,10 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,14 +29,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.SignalWifiOff
-import androidx.compose.material.icons.filled.Style
-import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -69,26 +63,20 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import kotlin.math.abs
+
+import com.dark.badlock.ui.theme.BadlockTheme
+import com.dark.badlock.R
+import androidx.compose.ui.tooling.preview.Preview
 
 // --- UI THEME & COLORS ---
 val DarkBackground = Color(0xFF10121A)
 val DarkSurface = Color(0xFF1C1E28)
 val PrimaryAccent = Color(0xFF8A2BE2) // Electric Blue-Violet
 val GreenAccent = Color(0xFF00FFA3) // Neon Mint
-val UpdateYellow = Color(0xFFFFD600) // Vibrant Yellow
+val UpdateYellow = Color(0xFFFFAB00) // Rich Gold
 val TextPrimary = Color.White.copy(alpha = 0.9f)
 val TextSecondary = Color.White.copy(alpha = 0.7f)
-
-@Composable
-fun BadlockTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
-) {
-    MaterialTheme(
-        typography = Typography(),
-        content = content
-    )
-}
 
 // --- DATA & STATE CLASSES ---
 data class ModuleInfo(
@@ -201,6 +189,8 @@ object GoodLockModules {
         ModuleInfo("Thermal Guardian", "com.samsung.android.thermalguardian", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/thermal-guardian/"),
         ModuleInfo("Media File Guardian", "com.samsung.android.mediaguardian", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/media-file-guardian/"),
         ModuleInfo("One Hand Operation+", "com.samsung.android.sidegesturepad", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/one-hand-operation/"),
+        ModuleInfo("Gallery Assistant", "com.samsung.android.gallery.assistant.app", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/gallery-assistant/"),
+        ModuleInfo("Battery Tracker", "com.android.samsung.batteryusage", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/battery-tracker/")
     )
 }
 
@@ -771,6 +761,25 @@ fun MainScreen(cacheManager: CacheManager) {
         }
     }
 
+    DisposableEffect(Unit) {
+        val packageReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                Log.d("BadlockAutoRefresh", "Package change detected, refreshing data...")
+                refreshData(force = true)
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+        }
+        context.registerReceiver(packageReceiver, filter)
+        onDispose {
+            context.unregisterReceiver(packageReceiver)
+        }
+    }
+
     val onModuleClick = remember<(InstalledModule) -> Unit> {
         { module -> if (module.isInstalled) launchModule(context, module) else openUrl(context, module.apkMirrorMainPage) }
     }
@@ -784,44 +793,50 @@ fun MainScreen(cacheManager: CacheManager) {
         { packageName -> openAppInfo(context, packageName) }
     }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Badlock", fontWeight = FontWeight.Bold, color = TextPrimary) },
-                actions = {
-                    IconButton(onClick = { refreshData(force = true) }, enabled = moduleState != ModuleState.Loading) {
-                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Refresh", tint = TextSecondary)
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = DarkBackground
-    ) { padding ->
-        Box(modifier = Modifier.padding(padding)) {
-            when (val state = moduleState) {
-                is ModuleState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = PrimaryAccent)
-                    }
+    Box(modifier = Modifier.fillMaxSize().background(DarkBackground)) {
+        when (val state = moduleState) {
+            is ModuleState.Loading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = PrimaryAccent, strokeWidth = 3.dp)
                 }
-                is ModuleState.Error -> {
-                    ErrorScreen(errorMessage = state.message, onRetry = { refreshData(force = true) })
+            }
+            is ModuleState.Error -> {
+                ErrorScreen(errorMessage = state.message, onRetry = { refreshData(force = true) })
+            }
+            is ModuleState.Success -> {
+                val updatableModules = remember(state.modules) {
+                    state.modules.values.flatten().filter { it.isUpdateAvailable }
                 }
-                is ModuleState.Success -> {
-                    val updatableModules = remember(state.modules) {
-                        state.modules.values.flatten().filter { it.isUpdateAvailable }
-                    }
-                    val tabs = listOf("Make up", "Life up", "Updates")
-                    val pagerState = rememberPagerState(pageCount = { tabs.size })
+                val tabs = listOf("Make up", "Life up", "Updates")
+                val pagerState = rememberPagerState(pageCount = { tabs.size })
 
-                    Column {
-                        Box(modifier = Modifier.weight(1f)) {
-                            HorizontalPager(
-                                state = pagerState,
-                                modifier = Modifier.fillMaxSize(),
-                                beyondBoundsPageCount = 1
-                            ) { page ->
+                Column(modifier = Modifier.fillMaxSize()) {
+                    LargeHeader(
+                        title = "Badlock",
+                        subtitle = if (updatableModules.isNotEmpty()) "${updatableModules.size} updates available" else "Your modules are up to date",
+                        onRefresh = { refreshData(force = true) },
+                        refreshEnabled = moduleState != ModuleState.Loading
+                    )
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize(),
+                            beyondBoundsPageCount = 1,
+                            verticalAlignment = Alignment.Top
+                        ) { page ->
+                            val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                            val alpha = 1f - abs(pageOffset).coerceIn(0f, 1f)
+                            val scale = 0.95f + (0.05f * (1f - abs(pageOffset).coerceIn(0f, 1f)))
+
+                            Box(modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    this.alpha = alpha
+                                    this.scaleX = scale
+                                    this.scaleY = scale
+                                }
+                            ) {
                                 val pageTitle = tabs[page]
                                 val modulesToShow = when (pageTitle) {
                                     "Updates" -> updatableModules
@@ -836,55 +851,184 @@ fun MainScreen(cacheManager: CacheManager) {
                                     onAppInfoClick = onAppInfoClick
                                 )
                             }
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(32.dp)
-                                    .align(Alignment.BottomCenter)
-                                    .background(brush = Brush.verticalGradient(colors = listOf(Color.Transparent, DarkBackground)))
-                            )
                         }
 
-                        TabRow(
-                            selectedTabIndex = pagerState.currentPage,
-                            containerColor = DarkBackground,
-                            indicator = {},
-                            divider = {}
-                        ) {
-                            tabs.forEachIndexed { index, title ->
-                                val isSelected = pagerState.currentPage == index
-                                val tabColor by animateColorAsState(
-                                    targetValue = if (isSelected) DarkSurface else Color.Transparent,
-                                    animationSpec = tween(durationMillis = 300)
+                        // Top Fade Effect Overlay
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp)
+                                .align(Alignment.TopCenter)
+                                .background(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(DarkBackground, Color.Transparent)
+                                    )
                                 )
-                                Tab(
-                                    selected = isSelected,
-                                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(index) } },
-                                    modifier = Modifier
-                                        .padding(vertical = 8.dp, horizontal = 12.dp)
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(tabColor),
-                                    text = {
-                                        if (title == "Updates" && updatableModules.isNotEmpty()) {
-                                            BadgedBox(
-                                                badge = { Badge(containerColor = PrimaryAccent) { Text("${updatableModules.size}") } }
-                                            ) { Text(title, fontWeight = FontWeight.SemiBold) }
-                                        } else {
-                                            Text(title, fontWeight = FontWeight.SemiBold)
-                                        }
-                                    },
-                                    icon = {
-                                        val icon = when(title) {
-                                            "Updates" -> Icons.Default.SystemUpdate
-                                            "Make up" -> Icons.Default.Palette
-                                            else -> Icons.Default.Style
-                                        }
-                                        Icon(icon, contentDescription = title)
-                                    },
-                                    selectedContentColor = PrimaryAccent,
-                                    unselectedContentColor = TextSecondary
-                                )
+                        )
+                    }
+                }
+
+                // Bottom Fade Effect
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, DarkBackground.copy(alpha = 0.5f), DarkBackground.copy(alpha = 0.9f))
+                            )
+                        )
+                )
+
+                // Bottom Island Navigation
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 40.dp)
+                ) {
+                    BottomIsland(
+                        tabs = tabs,
+                        currentPage = pagerState.currentPage,
+                        updatableCount = updatableModules.size,
+                        onTabClick = { index ->
+                            coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LargeHeader(
+    title: String,
+    subtitle: String,
+    onRefresh: () -> Unit,
+    refreshEnabled: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(start = 28.dp, end = 28.dp, top = 32.dp, bottom = 16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                fontSize = 40.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = TextPrimary,
+                letterSpacing = (-1).sp
+            )
+            Surface(
+                onClick = onRefresh,
+                enabled = refreshEnabled,
+                shape = RoundedCornerShape(16.dp),
+                color = DarkSurface,
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+            ) {
+                Box(modifier = Modifier.padding(12.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = subtitle,
+            fontSize = 16.sp,
+            color = if (subtitle.contains("updates")) UpdateYellow else TextSecondary,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BottomIsland(
+    tabs: List<String>,
+    currentPage: Int,
+    updatableCount: Int,
+    onTabClick: (Int) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .width(340.dp)
+            .height(64.dp),
+        shape = RoundedCornerShape(32.dp),
+        color = DarkSurface.copy(alpha = 0.98f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+        tonalElevation = 12.dp,
+        shadowElevation = 20.dp
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabs.forEachIndexed { index, title ->
+                val isSelected = currentPage == index
+                val contentColor by animateColorAsState(
+                    if (isSelected) PrimaryAccent else TextSecondary,
+                    label = "contentColor"
+                )
+                val backgroundColor by animateColorAsState(
+                    if (isSelected) PrimaryAccent.copy(alpha = 0.12f) else Color.Transparent,
+                    label = "backgroundColor"
+                )
+                val iconScale by animateFloatAsState(
+                    targetValue = if (isSelected) 1.25f else 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    ),
+                    label = "iconScale"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .height(48.dp)
+                        .weight(1f)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(backgroundColor)
+                        .clickable { onTabClick(index) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.graphicsLayer(scaleX = iconScale, scaleY = iconScale)
+                    ) {
+                        val icon = when (title) {
+                            "Updates" -> Icons.Default.SystemUpdate
+                            "Make up" -> Icons.Default.Palette
+                            else -> Icons.Default.Style
+                        }
+                        
+                        if (title == "Updates" && updatableCount > 0) {
+                            BadgedBox(
+                                badge = { 
+                                    Badge(
+                                        containerColor = PrimaryAccent,
+                                        contentColor = Color.White,
+                                        modifier = Modifier.offset(x = (-4).dp, y = 4.dp)
+                                    ) { Text("$updatableCount", fontSize = 10.sp) } 
+                                }
+                            ) {
+                                Icon(icon, contentDescription = title, tint = contentColor, modifier = Modifier.size(22.dp))
                             }
+                        } else {
+                            Icon(icon, contentDescription = title, tint = contentColor, modifier = Modifier.size(22.dp))
                         }
                     }
                 }
@@ -904,20 +1048,28 @@ fun ModuleList(
 ) {
     if (modules.isEmpty() && showEmptyMessage) {
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().padding(bottom = 100.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(imageVector = Icons.Default.SystemUpdate, contentDescription = "All up to date", tint = TextSecondary, modifier = Modifier.size(64.dp))
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("All Clear!", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+            Surface(
+                modifier = Modifier.size(100.dp),
+                shape = RoundedCornerShape(30.dp),
+                color = DarkSurface
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(imageVector = Icons.Default.DoneAll, contentDescription = "All up to date", tint = GreenAccent, modifier = Modifier.size(48.dp))
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            Text("All Clear!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
             Spacer(modifier = Modifier.height(8.dp))
             Text("All your modules are up-to-date.", color = TextSecondary, textAlign = TextAlign.Center)
         }
     } else {
         LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 140.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(items = modules, key = { it.packageName }) { module ->
                 ModuleCard(
@@ -940,56 +1092,85 @@ fun ModuleCard(
     onUpdateClick: () -> Unit,
     onAppInfoClick: () -> Unit
 ) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkSurface.copy(alpha = 0.8f)),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onModuleClick)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(onClick = onModuleClick),
+        color = DarkSurface.copy(alpha = 0.4f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
-                    .background(DarkBackground),
-                contentAlignment = Alignment.Center
+            // Icon
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = DarkBackground
             ) {
-                Image(
-                    painter = module.iconResId?.let { painterResource(id = it) } ?: painterResource(id = R.drawable.ic_launcher_foreground),
-                    contentDescription = "${module.name} icon",
-                    modifier = Modifier.size(32.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Image(
+                        painter = module.iconResId?.let { painterResource(id = it) }
+                            ?: painterResource(id = R.drawable.ic_launcher_foreground),
+                        contentDescription = "${module.name} icon",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
             }
-            Spacer(Modifier.width(16.dp))
+            
+            Spacer(Modifier.width(14.dp))
+            
             Column(Modifier.weight(1f)) {
-                Text(module.name, fontWeight = FontWeight.SemiBold, color = TextPrimary, fontSize = 16.sp)
-                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = module.name,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(2.dp))
                 VersionInfo(module)
             }
+            
+            // Actions
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (module.isInstalled) {
+                if (!module.isInstalled) {
+                    Button(
+                        onClick = onWebsiteClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = GreenAccent, contentColor = Color.Black),
+                        shape = RoundedCornerShape(16.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text("Install", fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    }
+                } else {
                     if (module.isUpdateAvailable) {
                         Button(
                             onClick = onUpdateClick,
                             colors = ButtonDefaults.buttonColors(containerColor = UpdateYellow, contentColor = Color.Black),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp)
-                        ) { Text("Update", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                            shape = RoundedCornerShape(16.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text("Update", fontWeight = FontWeight.Black, fontSize = 13.sp)
+                        }
+                        Spacer(Modifier.width(8.dp))
                     }
-                } else {
-                    Button(
-                        onClick = onWebsiteClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenAccent, contentColor = Color.Black),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp)
-                    ) { Text("Install", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
-                }
-                IconButton(onClick = onWebsiteClick) {
-                    Icon(Icons.Default.Public, contentDescription = "Go to Website", tint = TextSecondary)
-                }
-                if (module.isInstalled) {
-                    IconButton(onClick = onAppInfoClick) {
-                        Icon(Icons.Default.Info, contentDescription = "App Info", tint = TextSecondary)
+                    
+                    IconButton(
+                        onClick = onAppInfoClick,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(DarkBackground.copy(alpha = 0.4f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "App Info",
+                            tint = TextSecondary.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             }
@@ -999,26 +1180,19 @@ fun ModuleCard(
 
 @Composable
 fun VersionInfo(module: InstalledModule) {
-    val versionText = if (module.isInstalled) "v${module.versionName ?: "N/A"}" else "Not Installed"
+    val versionText = if (module.isInstalled) "v${module.versionName ?: "N/A"}" else "Tap to install"
     Text(versionText, color = TextSecondary, fontSize = 12.sp, maxLines = 1)
 
-    if (module.latestVersion != null) {
+    if (module.latestVersion != null && module.isInstalled) {
         val color = if (module.isUpdateAvailable) UpdateYellow else TextSecondary
-        Text("Latest: v${module.latestVersion}", color = color, fontSize = 12.sp, maxLines = 1)
-
-        val minVersionText = if (!module.minAndroidVersion.isNullOrBlank()) {
-            module.minAndroidVersion
-        } else {
-            "N/A"
-        }
-        Text("Requires: $minVersionText", color = TextSecondary, fontSize = 12.sp, maxLines = 1)
+        Text("Latest: v${module.latestVersion}", color = color.copy(alpha = 0.8f), fontSize = 11.sp, maxLines = 1)
     }
 
     if (module.latestVersion == null && module.isInstalled) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.CloudOff, contentDescription = "Error fetching version", tint = TextSecondary, modifier = Modifier.size(12.dp))
+            Icon(Icons.Default.CloudOff, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(12.dp))
             Spacer(Modifier.width(4.dp))
-            Text("Update check failed", color = TextSecondary, fontSize = 12.sp)
+            Text("Version check failed", color = TextSecondary, fontSize = 12.sp)
         }
     }
 }
@@ -1026,18 +1200,31 @@ fun VersionInfo(module: InstalledModule) {
 @Composable
 fun ErrorScreen(errorMessage: String, onRetry: () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(imageVector = Icons.Default.SignalWifiOff, contentDescription = "Connection Error", tint = TextSecondary, modifier = Modifier.size(64.dp))
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("Connection Error", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(errorMessage, color = TextSecondary, textAlign = TextAlign.Center)
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)) {
-            Text("Retry")
+        Surface(
+            modifier = Modifier.size(120.dp),
+            shape = RoundedCornerShape(40.dp),
+            color = DarkSurface
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(imageVector = Icons.Default.WifiOff, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(56.dp))
+            }
+        }
+        Spacer(modifier = Modifier.height(32.dp))
+        Text("Connection Issue", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(errorMessage, color = TextSecondary, textAlign = TextAlign.Center, fontSize = 16.sp)
+        Spacer(modifier = Modifier.height(40.dp))
+        Button(
+            onClick = onRetry,
+            colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier.height(56.dp).fillMaxWidth(0.7f)
+        ) {
+            Text("Try Again", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
     }
 }

@@ -1,15 +1,47 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
+# Build artifacts
 /build
-/captures
+/*/build
+*.apk
+*.aar
+
+# Gradle
+.gradle/
+/local.properties
+
+# IDE - IntelliJ / Android Studio
+.idea/workspace.xml
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/deploymentTargetSelector.xml
+.idea/studiobot.xml
+*.iml
+*.ipr
+*.iws
+.idea/tasks.xml
+.idea/shelf/
+.idea/dictionaries/
+
+# OS and Log files
+.DS_Store
+Thumbs.db
+*.log
+/captures/
+
+# External native builds
 .externalNativeBuild
-.cxx
-local.properties
+.cxx/
+
+# Signing & Sensitive Secrets
+# (Never commit these files to version control)
+*.jks
+*.keystore
+signing.properties
+secrets.properties
+google-services.json
+
+# --- NOTE ---
+# All images in app/src/main/res/ are DELIBERATELY TRACKED.
+# Do not add rules that ignore .jpg, .png, or .xml in res folders.
