@@ -27,20 +27,16 @@ App Info Shortcut: A one-tap shortcut to the Android App Info screen for easy ma
 
 Battery Tracker: Monitor power consumption of your installed modules at a glance.
 
-Screenshots
+***Screenshots****
 <div align="center">
 
 Main 
+<img width="1080" height="2210" alt="Screenshot_20260530_145049_badlock" src="https://github.com/user-attachments/assets/b04503a2-c253-43ce-8f37-decc6e33d9c8" />
 
-![Screenshot_20250818_191004_badlock](https://github.com/user-attachments/assets/b56d8995-8385-4162-b922-8df04f1650eb)
-Screen
-![Screenshot_20250820_085908_badlock](https://github.com/user-attachments/assets/2d8f18eb-730f-456c-8b0d-653c27ab18e4)
 
 
 Updates Tab
-
-
-![Screenshot_20250820_085914_badlock](https://github.com/user-attachments/assets/ab9e610a-d298-45fc-9b8c-a81db7aae674)
+<img width="1080" height="2210" alt="Screenshot_20260530_145054_badlock" src="https://github.com/user-attachments/assets/85fbc254-b136-4162-81ee-c8084fe3319b" />
 
 
 
