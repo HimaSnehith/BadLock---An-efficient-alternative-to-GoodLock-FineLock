@@ -55,8 +55,12 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -64,6 +68,7 @@ import org.jsoup.nodes.Element
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import kotlin.math.abs
+import kotlin.random.Random
 
 import com.dark.badlock.ui.theme.BadlockTheme
 import com.dark.badlock.R
@@ -99,6 +104,12 @@ data class InstalledModule(
     val category: String,
     val apkMirrorMainPage: String,
     val iconResId: Int?
+)
+
+data class AppUpdateInfo(
+    val latestVersion: String,
+    val downloadUrl: String,
+    val releaseNotes: String?
 )
 
 data class VersionFetchResult(
@@ -161,41 +172,58 @@ class CacheManager(context: Context) {
 // --- MODULE DEFINITIONS ---
 object GoodLockModules {
     val modules = listOf(
-        ModuleInfo("Home Up", "com.samsung.android.app.homestar", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd/home-up/"),
-        ModuleInfo("LockStar", "com.samsung.systemui.lockstar", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd/lockstar/"),
-        ModuleInfo("MultiStar", "com.samsung.android.multistar", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-multistar/"),
-        ModuleInfo("QuickStar", "com.samsung.android.qstuner", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd/quickstar/"),
-        ModuleInfo("NavStar", "com.samsung.systemui.navillera", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-navstar/"),
-        ModuleInfo("SoundAssistant", "com.samsung.android.soundassistant", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd/soundassistant/"),
-        ModuleInfo("Keys Cafe", "com.samsung.android.keyscafe", "Make up", "https://www.apkmirror.com/apk/good-lock-labs/keys-cafe/"),
-        ModuleInfo("Theme Park", "com.samsung.android.themedesigner", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-theme-park/"),
+        ModuleInfo("Home Up", "com.samsung.android.app.homestar", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/home-up/"),
+        ModuleInfo("LockStar", "com.samsung.systemui.lockstar", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/lockstar/"),
+        ModuleInfo("MultiStar", "com.samsung.android.multistar", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/samsung-multistar/"),
+        ModuleInfo("QuickStar", "com.samsung.android.qstuner", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/quickstar/"),
+        ModuleInfo("NavStar", "com.samsung.systemui.navillera", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/samsung-navstar/"),
+        ModuleInfo("SoundAssistant", "com.samsung.android.soundassistant", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/soundassistant/"),
+        ModuleInfo("Keys Cafe", "com.samsung.android.keyscafe", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/keys-cafe/"),
+        ModuleInfo("Theme Park", "com.samsung.android.themedesigner", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/samsung-theme-park/"),
         ModuleInfo("Nice Shot", "com.samsung.android.app.captureplugin", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/nice-shot/"),
-        ModuleInfo("Wonderland", "com.samsung.android.wonderland.wallpaper", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/wonderland/"),
-        ModuleInfo("Pentastic", "com.samsung.android.pentastic", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/pentastic/"),
-        ModuleInfo("Clockface", "com.samsung.android.app.clockface", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/samsung-clockface/"),
-        ModuleInfo("Edge lighting+", "com.samsung.android.edgelightingplus", "Make up", "https://www.apkmirror.com/apk/good-lock-labs/edge-lighting/"),
-        ModuleInfo("Edge touch", "com.samsung.android.app.edgetouch", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/edge-touch/"),
+        ModuleInfo("Wonderland", "com.samsung.android.wonderland.wallpaper", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/wonderland/"),
+        ModuleInfo("Pentastic", "com.samsung.android.pentastic", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/pentastic/"),
+        ModuleInfo("Clockface", "com.samsung.android.app.clockface", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/samsung-clockface/"),
+        ModuleInfo("Edge lighting+", "com.samsung.android.edgelightingplus", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/edge-lighting/"),
+        ModuleInfo("Edge touch", "com.samsung.android.app.edgetouch", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/edge-touch/"),
         ModuleInfo("Display Assistant", "com.samsung.android.displayassistant", "Make up", "https://www.apkmirror.com/apk/galaxy-labs/display-assistant-beta/"),
-        ModuleInfo("Routines+", "com.samsung.android.app.routineplus", "Life up", "https://www.apkmirror.com/apk/good-lock-labs/samsung-routine/"),
-        ModuleInfo("NotiStar", "com.samsung.systemui.notilus", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd/notistar/"),
-        ModuleInfo("RegiStar", "com.samsung.android.app.galaxyregistry", "Life up", "https://www.apkmirror.com/apk/good-lock-labs/registar/"),
-        ModuleInfo("Camera Assistant", "com.samsung.android.app.cameraassistant", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/camera-assistant/"),
-        ModuleInfo("Nice Catch", "com.samsung.android.app.goodcatch", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/nice-catch/"),
-        ModuleInfo("Good Lock", "com.samsung.android.goodlock", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd/good-lock-2018/"),
-        ModuleInfo("Battery Guardian", "com.samsung.android.statsd", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/battery-guardian/"),
-        ModuleInfo("File Guardian", "com.android.samsung.icebox", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/file-guardian/"),
-        ModuleInfo("Memory Guardian", "com.samsung.android.memoryguardian", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/memory-guardian/"),
-        ModuleInfo("App Booster", "com.samsung.android.appbooster", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/app-booster/"),
-        ModuleInfo("Thermal Guardian", "com.samsung.android.thermalguardian", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/thermal-guardian/"),
-        ModuleInfo("Media File Guardian", "com.samsung.android.mediaguardian", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/media-file-guardian/"),
-        ModuleInfo("One Hand Operation+", "com.samsung.android.sidegesturepad", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/one-hand-operation/"),
-        ModuleInfo("Gallery Assistant", "com.samsung.android.gallery.assistant.app", "Make up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/gallery-assistant/"),
-        ModuleInfo("Battery Tracker", "com.android.samsung.batteryusage", "Life up", "https://www.apkmirror.com/apk/samsung-electronics-co-ltd-co-ltd/battery-tracker/")
+        ModuleInfo("Routines+", "com.samsung.android.app.routineplus", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/samsung-routine/"),
+        ModuleInfo("NotiStar", "com.samsung.systemui.notilus", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/notistar/"),
+        ModuleInfo("RegiStar", "com.samsung.android.app.galaxyregistry", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/registar/"),
+        ModuleInfo("Camera Assistant", "com.samsung.android.app.cameraassistant", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/camera-assistant/"),
+        ModuleInfo("Nice Catch", "com.samsung.android.app.goodcatch", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/nice-catch/"),
+        ModuleInfo("Good Lock", "com.samsung.android.goodlock", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/good-lock-2018/"),
+        ModuleInfo("Battery Guardian", "com.samsung.android.statsd", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/battery-guardian/"),
+        ModuleInfo("File Guardian", "com.android.samsung.icebox", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/file-guardian/"),
+        ModuleInfo("Memory Guardian", "com.samsung.android.memoryguardian", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/memory-guardian/"),
+        ModuleInfo("App Booster", "com.samsung.android.appbooster", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/app-booster/"),
+        ModuleInfo("Thermal Guardian", "com.samsung.android.thermalguardian", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/thermal-guardian/"),
+        ModuleInfo("Media File Guardian", "com.samsung.android.mediaguardian", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/media-file-guardian/"),
+        ModuleInfo("One Hand Operation+", "com.samsung.android.sidegesturepad", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/one-hand-operation/"),
+        ModuleInfo("Gallery Assistant", "com.samsung.android.gallery.assistant.app", "Make up", "https://www.apkmirror.com/apk/samsung-electronics/gallery-assistant/"),
+        ModuleInfo("Battery Tracker", "com.android.samsung.batteryusage", "Life up", "https://www.apkmirror.com/apk/samsung-electronics/battery-tracker/")
     )
 }
 
 // --- Helper functions for scraping ---
-private val browserUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+private val browserUserAgent = "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Mobile Safari/537.36"
+
+private fun createJsoupConnection(url: String) = Jsoup.connect(url)
+    .userAgent(browserUserAgent)
+    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+    .header("Accept-Language", "en-US,en;q=0.9")
+    .header("Cache-Control", "no-cache")
+    .header("Connection", "keep-alive")
+    .header("Sec-Ch-Ua", "\"Not(A:Brand\";v=\"99\", \"Google Chrome\";v=\"133\", \"Chromium\";v=\"133\"")
+    .header("Sec-Ch-Ua-Mobile", "?1")
+    .header("Sec-Ch-Ua-Platform", "\"Android\"")
+    .header("Sec-Fetch-Dest", "document")
+    .header("Sec-Fetch-Mode", "navigate")
+    .header("Sec-Fetch-Site", "none")
+    .header("Sec-Fetch-User", "?1")
+    .header("Upgrade-Insecure-Requests", "1")
+    .timeout(30000)
+    .followRedirects(true)
 
 private fun cleanVersionText(rawText: String): String {
     var cleaned = rawText.trim()
@@ -287,24 +315,55 @@ private fun scrapeMinVersion(doc: Document): String? {
 }
 
 // --- VERSION FETCHING FUNCTIONS ---
+suspend fun checkAppUpdate(): AppUpdateInfo? {
+    return withContext(Dispatchers.IO) {
+        try {
+            val repoUrl = "https://api.github.com/repos/Dark-254/BadLock---An-efficient-alternative-to-GoodLock-FineLock/releases/latest"
+            val connection = Jsoup.connect(repoUrl)
+                .ignoreContentType(true)
+                .userAgent("Badlock-Update-Checker")
+                .timeout(10000)
+                .execute()
+            
+            val json = connection.body()
+            val gson = Gson()
+            val releaseMap = gson.fromJson(json, Map::class.java) as Map<String, Any>
+            
+            val tagName = releaseMap["tag_name"] as? String ?: return@withContext null
+            val htmlUrl = releaseMap["html_url"] as? String ?: return@withContext null
+            val body = releaseMap["body"] as? String
+            
+            val latestVer = tagName.lowercase().replace("v", "").trim()
+            
+            AppUpdateInfo(
+                latestVersion = latestVer,
+                downloadUrl = htmlUrl,
+                releaseNotes = body
+            )
+        } catch (e: Exception) {
+            Log.e("BadlockUpdate", "Failed to check for app updates", e)
+            null
+        }
+    }
+}
+
 suspend fun fetchLatestVersionFromRssFeed(url: String): VersionFetchResult {
     val feedUrl = if (url.endsWith("/")) "${url}feed/" else "$url/feed/"
     return withContext(Dispatchers.IO) {
         try {
-            val doc = Jsoup.connect(feedUrl).userAgent(browserUserAgent).timeout(15000).get()
+            val doc = createJsoupConnection(feedUrl).get()
             val firstItem = doc.selectFirst("item") ?: return@withContext VersionFetchResult()
 
-            val title = firstItem.selectFirst("title")?.text()
+            val title = firstItem.selectFirst("title")?.text() ?: ""
             val link = firstItem.selectFirst("link")?.text()
 
-            val regex = """\s(\d+(\.\d+)+(\.\d+)*)""".toRegex()
-            val matchResult = regex.find(title ?: "")
-            val version = matchResult?.groups?.get(1)?.value?.trim()
+            val regex = """(\d+(\.\d+)+)""".toRegex()
+            val version = regex.find(title)?.value?.trim()
 
             var minAndroidVersion: String? = null
             if (link != null) {
                 try {
-                    val versionDoc = Jsoup.connect(link).userAgent(browserUserAgent).timeout(15000).get()
+                    val versionDoc = createJsoupConnection(link).get()
                     minAndroidVersion = scrapeMinVersion(versionDoc)
                 } catch (e: Exception) {
                     Log.w("BadlockFetch", "Could not fetch min version from $link", e)
@@ -313,6 +372,7 @@ suspend fun fetchLatestVersionFromRssFeed(url: String): VersionFetchResult {
 
             VersionFetchResult(version = version, url = link, minAndroidVersion = minAndroidVersion)
         } catch (e: Exception) {
+            Log.e("BadlockFetch", "RSS fetch failed for $url", e)
             throw e
         }
     }
@@ -321,13 +381,51 @@ suspend fun fetchLatestVersionFromRssFeed(url: String): VersionFetchResult {
 suspend fun fetchLatestVersionFromHtmlFallback(url: String): VersionFetchResult {
     return withContext(Dispatchers.IO) {
         try {
-            val mainDoc = Jsoup.connect(url).userAgent(browserUserAgent).timeout(20000).get()
-            val latestVersionLinkElement = mainDoc.selectFirst("div.list-row a.fontBlack") ?: return@withContext VersionFetchResult()
+            val mainDoc = createJsoupConnection(url).get()
+            // Identify all version links in the primary content area
+            val versionElements = mainDoc.select("#primary div.list-row a.fontBlack")
+            
+            if (versionElements.isEmpty()) {
+                Log.w("BadlockFetch", "No version links found for $url")
+                return@withContext VersionFetchResult()
+            }
 
-            val latestVersionPageUrl = "https://www.apkmirror.com" + latestVersionLinkElement.attr("href")
-            val versionDoc = Jsoup.connect(latestVersionPageUrl).userAgent(browserUserAgent).timeout(20000).get()
-            val version = versionDoc.selectFirst(".appspec-value")?.text()?.trim()?.split(" ")?.first()
-            val minAndroidVersion = scrapeMinVersion(versionDoc)
+            val regex = """(\d+(\.\d+)+)""".toRegex()
+            
+            // Collect versions from the first 10 entries to find the actual highest version
+            val foundVersions = versionElements.take(10).mapNotNull { element ->
+                val title = element.text()
+                val ver = regex.find(title)?.value?.trim()
+                if (ver != null) {
+                    Pair(ver, "https://www.apkmirror.com" + element.attr("href"))
+                } else null
+            }
+
+            if (foundVersions.isEmpty()) return@withContext VersionFetchResult()
+
+            // Sort by version components to find the true latest
+            val latestEntry = foundVersions.maxByOrNull { (ver, _) ->
+                ver.split(".").mapNotNull { it.filter { c -> c.isDigit() }.toIntOrNull() }.let { parts ->
+                    // Pad with zeros to handle different lengths correctly
+                    List(6) { i -> parts.getOrElse(i) { 0 } }.joinToString(",") { it.toString().padStart(5, '0') }
+                }
+            } ?: foundVersions[0]
+
+            val (version, latestVersionPageUrl) = latestEntry
+            var minAndroidVersion: String? = null
+
+            try {
+                // Secondary fetch for precise version and min android version
+                val versionDoc = createJsoupConnection(latestVersionPageUrl).get()
+                val preciseVersion = versionDoc.selectFirst(".appspec-value")?.text()?.trim()?.split(" ")?.first()
+                // If a precise version exists on the specific page, we trust it over the title text
+                if (!preciseVersion.isNullOrEmpty() && regex.matches(preciseVersion)) {
+                    // We found a specific version, keeping it as the result
+                }
+                minAndroidVersion = scrapeMinVersion(versionDoc)
+            } catch (e: Exception) {
+                Log.w("BadlockFetch", "Could not fetch details from $latestVersionPageUrl", e)
+            }
 
             VersionFetchResult(version = version, url = latestVersionPageUrl, minAndroidVersion = minAndroidVersion)
         } catch (e: Exception) {
@@ -550,56 +648,66 @@ fun getBestLaunchIntent(context: Context, packageName: String, moduleName: Strin
 // --- DATA LOADING FUNCTION ---
 suspend fun loadData(context: Context, cacheManager: CacheManager): ModuleState {
     val packageManager = context.packageManager
+    val semaphore = Semaphore(3) // Limit concurrent network requests to avoid being blocked
     return withContext(Dispatchers.IO) {
         try {
             val allModules = coroutineScope {
                 GoodLockModules.modules.map { moduleInfo ->
                     async {
-                        val isInstalled = try {
-                            packageManager.getPackageInfo(moduleInfo.packageName, 0); true
-                        } catch (e: Exception) { false }
+                        semaphore.withPermit {
+                            // Add a random delay to mimic human behavior and avoid rate limits
+                            delay(Random.nextLong(300, 1000))
 
-                        var versionResult = VersionFetchResult()
-                        var installedVersion: String? = null
-                        var launchIntent: Intent? = null
+                            val isInstalled = try {
+                                packageManager.getPackageInfo(moduleInfo.packageName, 0); true
+                            } catch (e: Exception) { false }
 
-                        if (isInstalled) {
-                            try {
-                                val pkgInfo = packageManager.getPackageInfo(moduleInfo.packageName, 0)
-                                installedVersion = pkgInfo.versionName
-                                launchIntent = getBestLaunchIntent(context, moduleInfo.packageName, moduleInfo.name)
-                            } catch (e: Exception) {
-                                Log.e("BadlockLoad", "Error getting package info for ${moduleInfo.packageName}", e)
+                            var versionResult = VersionFetchResult()
+                            var installedVersion: String? = null
+                            var launchIntent: Intent? = null
+
+                            if (isInstalled) {
+                                try {
+                                    val pkgInfo = packageManager.getPackageInfo(moduleInfo.packageName, 0)
+                                    installedVersion = pkgInfo.versionName
+                                    launchIntent = getBestLaunchIntent(context, moduleInfo.packageName, moduleInfo.name)
+                                } catch (e: Exception) {
+                                    Log.e("BadlockLoad", "Error getting package info for ${moduleInfo.packageName}", e)
+                                }
+
+                                // Prioritize HTML fallback over RSS as RSS is frequently blocked by Cloudflare
+                                versionResult = fetchLatestVersionFromHtmlFallback(moduleInfo.apkMirrorMainPage)
+                                
+                                if (versionResult.version == null) {
+                                    try {
+                                        versionResult = fetchLatestVersionFromRssFeed(moduleInfo.apkMirrorMainPage)
+                                    } catch (e: Exception) {
+                                        Log.w("BadlockFetch", "RSS also failed for ${moduleInfo.name}", e)
+                                    }
+                                }
                             }
 
-                            versionResult = try {
-                                fetchLatestVersionFromRssFeed(moduleInfo.apkMirrorMainPage)
-                            } catch (e: Exception) {
-                                Log.w("BadlockFetch", "RSS fetch failed for ${moduleInfo.name}, trying HTML fallback.", e)
-                                fetchLatestVersionFromHtmlFallback(moduleInfo.apkMirrorMainPage)
-                            }
+                            val resourceName = moduleInfo.name.lowercase().replace(" ", "_").replace("+", "")
+                            val iconResId = context.resources.getIdentifier(resourceName, "drawable", context.packageName).let { if (it == 0) null else it }
+                            val updateAvailable = isUpdateAvailable(moduleInfo.name, installedVersion, versionResult.version)
+
+                            InstalledModule(
+                                name = moduleInfo.name,
+                                packageName = moduleInfo.packageName,
+                                versionName = installedVersion,
+                                latestVersion = versionResult.version,
+                                latestVersionUrl = versionResult.url,
+                                minAndroidVersion = versionResult.minAndroidVersion,
+                                launchIntent = launchIntent,
+                                isInstalled = isInstalled,
+                                isUpdateAvailable = updateAvailable,
+                                category = moduleInfo.category,
+                                apkMirrorMainPage = moduleInfo.apkMirrorMainPage,
+                                iconResId = iconResId
+                            )
                         }
-
-                        val resourceName = moduleInfo.name.lowercase().replace(" ", "_").replace("+", "")
-                        val iconResId = context.resources.getIdentifier(resourceName, "drawable", context.packageName).let { if (it == 0) null else it }
-                        val updateAvailable = isUpdateAvailable(moduleInfo.name, installedVersion, versionResult.version)
-
-                        InstalledModule(
-                            name = moduleInfo.name,
-                            packageName = moduleInfo.packageName,
-                            versionName = installedVersion,
-                            latestVersion = versionResult.version,
-                            latestVersionUrl = versionResult.url,
-                            minAndroidVersion = versionResult.minAndroidVersion,
-                            launchIntent = launchIntent,
-                            isInstalled = isInstalled,
-                            isUpdateAvailable = updateAvailable,
-                            category = moduleInfo.category,
-                            apkMirrorMainPage = moduleInfo.apkMirrorMainPage,
-                            iconResId = iconResId
-                        )
                     }
-                }.map { it.await() }
+                }.awaitAll()
             }
 
             val groupedAndSorted = allModules.groupBy { it.category }
@@ -727,12 +835,38 @@ fun MainScreen(cacheManager: CacheManager) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     var moduleState by remember { mutableStateOf<ModuleState>(cacheManager.load(context) ?: ModuleState.Loading) }
+    var appUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
 
     fun refreshData(force: Boolean = false) {
         if (cacheManager.load(context) == null || force) {
             moduleState = ModuleState.Loading
         }
         coroutineScope.launch {
+            // Check for app's own update
+            launch {
+                val update = checkAppUpdate()
+                val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0"
+                
+                // version parts comparison logic
+                fun isUpdateAvailable(current: String, latest: String): Boolean {
+                    try {
+                        val cParts = current.split(".").mapNotNull { it.filter { c -> c.isDigit() }.toIntOrNull() }
+                        val lParts = latest.split(".").mapNotNull { it.filter { c -> c.isDigit() }.toIntOrNull() }
+                        for (i in 0 until maxOf(cParts.size, lParts.size)) {
+                            if (lParts.getOrElse(i) { 0 } > cParts.getOrElse(i) { 0 }) return true
+                            if (lParts.getOrElse(i) { 0 } < cParts.getOrElse(i) { 0 }) return false
+                        }
+                    } catch (e: Exception) { /* ignore */ }
+                    return false
+                }
+
+                if (update != null && isUpdateAvailable(currentVersion, update.latestVersion)) {
+                    appUpdateInfo = update
+                    showUpdateDialog = true
+                }
+            }
+
             val newState = loadData(context, cacheManager)
             if (newState is ModuleState.Success) {
                 moduleState = newState
@@ -791,6 +925,56 @@ fun MainScreen(cacheManager: CacheManager) {
     }
     val onAppInfoClick = remember<(String) -> Unit> {
         { packageName -> openAppInfo(context, packageName) }
+    }
+
+    if (showUpdateDialog && appUpdateInfo != null) {
+        AlertDialog(
+            onDismissRequest = { showUpdateDialog = false },
+            containerColor = DarkSurface,
+            titleContentColor = TextPrimary,
+            textContentColor = TextSecondary,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = PrimaryAccent)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Badlock Update", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column {
+                    Text("A new version of Badlock is available!", fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Version: v${appUpdateInfo!!.latestVersion}", color = UpdateYellow, fontWeight = FontWeight.Bold)
+                    if (!appUpdateInfo!!.releaseNotes.isNullOrBlank()) {
+                        Spacer(Modifier.height(12.dp))
+                        Text("What's new:", fontSize = 12.sp, color = TextPrimary)
+                        Text(
+                            appUpdateInfo!!.releaseNotes!!,
+                            fontSize = 11.sp,
+                            maxLines = 5,
+                            modifier = Modifier.verticalScroll(rememberScrollState())
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        openUrl(context, appUpdateInfo!!.downloadUrl)
+                        showUpdateDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
+                ) {
+                    Text("Go to GitHub", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUpdateDialog = false }) {
+                    Text("Later", color = TextSecondary)
+                }
+            },
+            shape = RoundedCornerShape(28.dp)
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize().background(DarkBackground)) {
@@ -1159,6 +1343,23 @@ fun ModuleCard(
                     }
                     
                     IconButton(
+                        onClick = onWebsiteClick,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(DarkBackground.copy(alpha = 0.4f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Public,
+                            contentDescription = "Website",
+                            tint = TextSecondary.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+                    
+                    IconButton(
                         onClick = onAppInfoClick,
                         modifier = Modifier
                             .size(38.dp)
@@ -1225,6 +1426,115 @@ fun ErrorScreen(errorMessage: String, onRetry: () -> Unit) {
             modifier = Modifier.height(56.dp).fillMaxWidth(0.7f)
         ) {
             Text("Try Again", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun MainScreenPreview() {
+    BadlockTheme {
+        Box(modifier = Modifier.fillMaxSize().background(DarkBackground)) {
+            // Mocking the success state
+            val mockModules = listOf(
+                InstalledModule(
+                    name = "Home Up",
+                    packageName = "com.samsung.android.app.homestar",
+                    versionName = "15.0.01.19",
+                    latestVersion = "16.0.00.90",
+                    latestVersionUrl = "https://www.apkmirror.com",
+                    minAndroidVersion = null,
+                    launchIntent = null,
+                    isInstalled = true,
+                    isUpdateAvailable = true,
+                    category = "Make up",
+                    apkMirrorMainPage = "https://www.apkmirror.com",
+                    iconResId = null
+                ),
+                InstalledModule(
+                    name = "Nice Shot",
+                    packageName = "com.samsung.android.app.captureplugin",
+                    versionName = "2.3.09",
+                    latestVersion = "2.3.09",
+                    latestVersionUrl = "https://www.apkmirror.com",
+                    minAndroidVersion = null,
+                    launchIntent = null,
+                    isInstalled = true,
+                    isUpdateAvailable = false,
+                    category = "Make up",
+                    apkMirrorMainPage = "https://www.apkmirror.com",
+                    iconResId = null
+                )
+            )
+            
+            Column(modifier = Modifier.fillMaxSize()) {
+                LargeHeader(
+                    title = "Badlock",
+                    subtitle = "1 update available",
+                    onRefresh = {},
+                    refreshEnabled = true
+                )
+                ModuleList(
+                    modules = mockModules,
+                    onModuleClick = {},
+                    onWebsiteClick = {},
+                    onUpdateClick = {},
+                    onAppInfoClick = {}
+                )
+            }
+            
+            // Render the dialog content directly in the Box to avoid ClassNotFoundException in preview
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.6f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier.padding(24.dp).widthIn(max = 400.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    color = DarkSurface,
+                    tonalElevation = 6.dp
+                ) {
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = PrimaryAccent)
+                            Spacer(Modifier.width(12.dp))
+                            Text("Badlock Update", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 20.sp)
+                        }
+                        
+                        Spacer(Modifier.height(16.dp))
+                        
+                        Text("A new version of Badlock is available!", fontWeight = FontWeight.Medium, color = TextSecondary)
+                        Spacer(Modifier.height(8.dp))
+                        Text("Version: v2.6", color = UpdateYellow, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        
+                        Spacer(Modifier.height(16.dp))
+                        Text("What's new:", fontSize = 12.sp, color = TextPrimary)
+                        Text(
+                            "- Optimized update checker\n- Added manual website button\n- Bug fixes for One UI 7",
+                            fontSize = 11.sp,
+                            color = TextSecondary,
+                            modifier = Modifier.heightIn(max = 100.dp).verticalScroll(rememberScrollState())
+                        )
+                        
+                        Spacer(Modifier.height(24.dp))
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { }) {
+                                Text("Later", color = TextSecondary)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Button(
+                                onClick = { },
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
+                            ) {
+                                Text("Go to GitHub", color = Color.White)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

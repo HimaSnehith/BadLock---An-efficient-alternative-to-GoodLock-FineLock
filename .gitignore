@@ -41,6 +41,8 @@ Thumbs.db
 signing.properties
 secrets.properties
 google-services.json
+/key
+/release
 
 # --- NOTE ---
 # All images in app/src/main/res/ are DELIBERATELY TRACKED.
