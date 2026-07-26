@@ -1,49 +1,67 @@
 package com.dark.badlock.ui.theme
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
+import android.app.Activity
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-
-// Define the colors to match Good Lock's clean aesthetic
-val GoodLockBlue = Color(0xFF6B4BFF)
-val GoodLockBackground = Color(0xFFF0F0F0)
-val GoodLockCard = Color(0xFFFFFFFF)
-val GoodLockPurple = Color(0xFF5A44E5) // A variant of blue used in buttons
-
-private val LightColorScheme = lightColorScheme(
-    primary = GoodLockBlue,
-    secondary = GoodLockBackground,
-    tertiary = GoodLockCard,
-    background = GoodLockBackground,
-    surface = GoodLockCard,
-    onPrimary = Color.White,
-    onSecondary = Color.Black,
-    onTertiary = Color.Black,
-    onBackground = Color.Black,
-    onSurface = Color.Black,
-)
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = GoodLockBlue,
-    secondary = GoodLockBackground,
-    tertiary = GoodLockCard,
-    background = GoodLockBackground,
-    surface = GoodLockCard,
+    primary = PrimaryAccent,
+    secondary = GreenAccent,
+    tertiary = UpdateYellow,
+    background = DarkBackground,
+    surface = DarkSurface,
     onPrimary = Color.White,
     onSecondary = Color.Black,
     onTertiary = Color.Black,
-    onBackground = Color.Black,
-    onSurface = Color.Black,
+    onBackground = TextPrimary,
+    onSurface = TextPrimary,
+)
+
+private val LightColorScheme = lightColorScheme(
+    primary = PrimaryAccent,
+    secondary = GreenAccent,
+    tertiary = UpdateYellow,
+    background = Color(0xFFFFFBFE),
+    surface = Color(0xFFFFFBFE),
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
+    onBackground = Color(0xFF1C1B1F),
+    onSurface = Color(0xFF1C1B1F),
 )
 
 @Composable
 fun BadlockTheme(
-    darkTheme: Boolean = false, // You can make this dynamic if you want
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    // Dynamic color is available on Android 12+
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val context = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
+    }
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = Color.Transparent.toArgb()
+            window.navigationBarColor = Color.Transparent.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+        }
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,
