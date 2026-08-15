@@ -196,16 +196,18 @@ fun MainScreen(viewModel: BadlockViewModel) {
                                             fontWeight = FontWeight.ExtraBold,
                                             color = TextPrimary
                                         )
-                                        if (scrollBehavior.state.collapsedFraction < 0.5f) {
-                                            Text(
-                                                text = if (searchQuery.isNotEmpty()) "${searchResults.size} results found"
-                                                else if (updatableModules.isNotEmpty()) "${updatableModules.size} updates available"
-                                                else "Your modules are up to date",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = if (updatableModules.isNotEmpty() && searchQuery.isEmpty()) UpdateYellow else TextSecondary,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
+                                        Text(
+                                            text = if (searchQuery.isNotEmpty()) "${searchResults.size} results found"
+                                            else if (updatableModules.isNotEmpty()) "${updatableModules.size} updates available"
+                                            else "Your modules are up to date",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (updatableModules.isNotEmpty() && searchQuery.isEmpty()) UpdateYellow else TextSecondary,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.graphicsLayer {
+                                                // Smoothly fade out the subtitle as we scroll up
+                                                alpha = (1f - scrollBehavior.state.collapsedFraction * 2f).coerceIn(0f, 1f)
+                                            }
+                                        )
                                     }
                                 },
                                 actions = {
@@ -265,16 +267,16 @@ fun MainScreen(viewModel: BadlockViewModel) {
                                 beyondBoundsPageCount = 1,
                                 verticalAlignment = Alignment.Top
                             ) { page ->
-                                val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
-                                val alpha = 1f - abs(pageOffset).coerceIn(0f, 1f)
-                                val scale = 0.95f + (0.05f * (1f - abs(pageOffset).coerceIn(0f, 1f)))
-
                                 Box(modifier = Modifier
                                     .fillMaxSize()
                                     .graphicsLayer {
-                                        this.alpha = alpha
-                                        this.scaleX = scale
-                                        this.scaleY = scale
+                                        // Move calculations here to avoid recomposition during pager swipes
+                                        val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                                        val fraction = 1f - abs(pageOffset).coerceIn(0f, 1f)
+                                        
+                                        alpha = fraction
+                                        scaleX = 0.95f + (0.05f * fraction)
+                                        scaleY = 0.95f + (0.05f * fraction)
                                     }
                                 ) {
                                     val pageTitle = tabs[page]

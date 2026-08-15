@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -190,35 +191,35 @@ fun ModuleCard(
     onUpdateClick: () -> Unit,
     onAppInfoClick: () -> Unit
 ) {
-    Surface(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
+            .background(DarkSurface.copy(alpha = 0.4f))
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)), RoundedCornerShape(24.dp))
             .combinedClickable(
                 onClick = onModuleClick,
                 onLongClick = onModuleLongClick
-            ),
-        color = DarkSurface.copy(alpha = 0.4f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+            )
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Icon
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(14.dp),
-                color = DarkBackground
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(DarkBackground),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Image(
-                        painter = module.iconResId?.let { painterResource(id = it) }
-                            ?: painterResource(id = R.drawable.ic_launcher_foreground),
-                        contentDescription = "${module.name} icon",
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
+                Image(
+                    painter = module.iconResId?.let { painterResource(id = it) }
+                        ?: painterResource(id = R.drawable.ic_launcher_foreground),
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp)
+                )
             }
 
             Spacer(Modifier.width(14.dp))
