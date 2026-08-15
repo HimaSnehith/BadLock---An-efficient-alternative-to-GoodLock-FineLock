@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.dark.badlock.data.AppUpdateInfo
+import com.dark.badlock.data.InstalledModule
 import com.dark.badlock.data.ModuleRepository
 import com.dark.badlock.data.ModuleState
 import com.dark.badlock.logic.UpdateChecker
@@ -19,19 +20,18 @@ import kotlinx.coroutines.launch
 class BadlockViewModel(private val repository: ModuleRepository, private val context: Context) : ViewModel() {
 
     private val _moduleState = MutableStateFlow<ModuleState>(ModuleState.Loading)
+    val moduleState: StateFlow<ModuleState> = _moduleState.asStateFlow()
     
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    val moduleState: StateFlow<ModuleState> = combine(_moduleState, _searchQuery) { state, query ->
-        if (query.isEmpty() || state !is ModuleState.Success) return@combine state
+    val searchResults: StateFlow<List<InstalledModule>> = combine(_moduleState, _searchQuery) { state, query ->
+        if (query.isEmpty() || state !is ModuleState.Success) return@combine emptyList()
 
-        val filtered = state.modules.mapValues { entry ->
-            entry.value.filter { it.name.contains(query, ignoreCase = true) || it.packageName.contains(query, ignoreCase = true) }
-        }.filter { it.value.isNotEmpty() }
-
-        ModuleState.Success(filtered)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ModuleState.Loading)
+        state.modules.values.flatten().filter { 
+            it.name.contains(query, ignoreCase = true) || it.packageName.contains(query, ignoreCase = true) 
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _appUpdateInfo = MutableStateFlow<AppUpdateInfo?>(null)
     val appUpdateInfo: StateFlow<AppUpdateInfo?> = _appUpdateInfo.asStateFlow()

@@ -217,6 +217,9 @@ fun BottomIsland(
 fun ModuleList(
     modules: List<InstalledModule>,
     showEmptyMessage: Boolean = false,
+    emptyTitle: String = "All Clear!",
+    emptySubtitle: String = "All your modules are up-to-date.",
+    emptyIcon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Default.DoneAll,
     onModuleClick: (InstalledModule) -> Unit,
     onModuleLongClick: (InstalledModule) -> Unit,
     onWebsiteClick: (String) -> Unit,
@@ -235,13 +238,13 @@ fun ModuleList(
                 color = DarkSurface
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(imageVector = Icons.Default.DoneAll, contentDescription = "All up to date", tint = GreenAccent, modifier = Modifier.size(48.dp))
+                    Icon(imageVector = emptyIcon, contentDescription = null, tint = GreenAccent, modifier = Modifier.size(48.dp))
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
-            Text("All Clear!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+            Text(emptyTitle, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("All your modules are up-to-date.", color = TextSecondary, textAlign = TextAlign.Center)
+            Text(emptySubtitle, color = TextSecondary, textAlign = TextAlign.Center)
         }
     } else {
         LazyColumn(

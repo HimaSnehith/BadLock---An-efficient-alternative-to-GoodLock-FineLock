@@ -15,7 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,6 +50,7 @@ fun MainScreen(viewModel: BadlockViewModel) {
     val appUpdateInfo by viewModel.appUpdateInfo.collectAsState()
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val searchResults by viewModel.searchResults.collectAsState()
 
     var selectedModule by remember { mutableStateOf<InstalledModule?>(null) }
 
@@ -182,7 +183,9 @@ fun MainScreen(viewModel: BadlockViewModel) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     LargeHeader(
                         title = "Badlock",
-                        subtitle = if (updatableModules.isNotEmpty()) "${updatableModules.size} updates available" else "Your modules are up to date",
+                        subtitle = if (searchQuery.isNotEmpty()) "${searchResults.size} results found" 
+                                   else if (updatableModules.isNotEmpty()) "${updatableModules.size} updates available" 
+                                   else "Your modules are up to date",
                         onRefresh = { viewModel.refreshData(force = true) },
                         refreshEnabled = true,
                         searchQuery = searchQuery,
@@ -190,44 +193,69 @@ fun MainScreen(viewModel: BadlockViewModel) {
                     )
 
                     Box(modifier = Modifier.weight(1f)) {
-                        HorizontalPager(
-                            state = pagerState,
-                            modifier = Modifier.fillMaxSize(),
-                            beyondBoundsPageCount = 1,
-                            verticalAlignment = Alignment.Top
-                        ) { page ->
-                            val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
-                            val alpha = 1f - abs(pageOffset).coerceIn(0f, 1f)
-                            val scale = 0.95f + (0.05f * (1f - abs(pageOffset).coerceIn(0f, 1f)))
+                        if (searchQuery.isEmpty()) {
+                            HorizontalPager(
+                                state = pagerState,
+                                modifier = Modifier.fillMaxSize(),
+                                beyondBoundsPageCount = 1,
+                                verticalAlignment = Alignment.Top
+                            ) { page ->
+                                val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                                val alpha = 1f - abs(pageOffset).coerceIn(0f, 1f)
+                                val scale = 0.95f + (0.05f * (1f - abs(pageOffset).coerceIn(0f, 1f)))
 
-                            Box(modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    this.alpha = alpha
-                                    this.scaleX = scale
-                                    this.scaleY = scale
+                                Box(modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        this.alpha = alpha
+                                        this.scaleX = scale
+                                        this.scaleY = scale
+                                    }
+                                ) {
+                                    val pageTitle = tabs[page]
+                                    val modulesToShow = when (pageTitle) {
+                                        "Updates" -> updatableModules
+                                        else -> state.modules[pageTitle] ?: emptyList()
+                                    }
+                                    ModuleList(
+                                        modules = modulesToShow,
+                                        showEmptyMessage = (pageTitle == "Updates"),
+                                        onModuleClick = { module ->
+                                            if (module.isInstalled) LaunchHelper.launchModule(context, module)
+                                            else LaunchHelper.openUrl(context, module.apkMirrorMainPage)
+                                        },
+                                        onModuleLongClick = { module ->
+                                            selectedModule = module
+                                        },
+                                        onWebsiteClick = { url -> LaunchHelper.openUrl(context, url) },
+                                        onUpdateClick = { module -> module.latestVersionUrl?.let { LaunchHelper.openUrl(context, it) } },
+                                        onAppInfoClick = { packageName -> LaunchHelper.openAppInfo(context, packageName) }
+                                    )
                                 }
-                            ) {
-                                val pageTitle = tabs[page]
-                                val modulesToShow = when (pageTitle) {
-                                    "Updates" -> updatableModules
-                                    else -> state.modules[pageTitle] ?: emptyList()
-                                }
-                                ModuleList(
-                                    modules = modulesToShow,
-                                    showEmptyMessage = (pageTitle == "Updates"),
-                                    onModuleClick = { module ->
-                                        if (module.isInstalled) LaunchHelper.launchModule(context, module)
-                                        else LaunchHelper.openUrl(context, module.apkMirrorMainPage)
-                                    },
-                                    onModuleLongClick = { module ->
-                                        selectedModule = module
-                                    },
-                                    onWebsiteClick = { url -> LaunchHelper.openUrl(context, url) },
-                                    onUpdateClick = { module -> module.latestVersionUrl?.let { LaunchHelper.openUrl(context, it) } },
-                                    onAppInfoClick = { packageName -> LaunchHelper.openAppInfo(context, packageName) }
-                                )
                             }
+                        } else {
+                            ModuleList(
+                                modules = searchResults,
+                                showEmptyMessage = true,
+                                emptyTitle = "No Results",
+                                emptySubtitle = "We couldn't find any modules matching your search.",
+                                emptyIcon = Icons.Default.SearchOff,
+                                onModuleClick = { module ->
+                                    val targetTab = tabs.indexOf(module.category)
+                                    viewModel.updateSearchQuery("")
+                                    if (targetTab != -1) {
+                                        coroutineScope.launch { pagerState.animateScrollToPage(targetTab) }
+                                    }
+                                    if (module.isInstalled) LaunchHelper.launchModule(context, module)
+                                    else LaunchHelper.openUrl(context, module.apkMirrorMainPage)
+                                },
+                                onModuleLongClick = { module ->
+                                    selectedModule = module
+                                },
+                                onWebsiteClick = { url -> LaunchHelper.openUrl(context, url) },
+                                onUpdateClick = { module -> module.latestVersionUrl?.let { LaunchHelper.openUrl(context, it) } },
+                                onAppInfoClick = { packageName -> LaunchHelper.openAppInfo(context, packageName) }
+                            )
                         }
 
                         // Top Fade Effect Overlay
@@ -259,19 +287,21 @@ fun MainScreen(viewModel: BadlockViewModel) {
                 )
 
                 // Bottom Island Navigation
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 40.dp)
-                ) {
-                    BottomIsland(
-                        tabs = tabs,
-                        currentPage = pagerState.currentPage,
-                        updatableCount = updatableModules.size,
-                        onTabClick = { index ->
-                            coroutineScope.launch { pagerState.animateScrollToPage(index) }
-                        }
-                    )
+                if (searchQuery.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 40.dp)
+                    ) {
+                        BottomIsland(
+                            tabs = tabs,
+                            currentPage = pagerState.currentPage,
+                            updatableCount = updatableModules.size,
+                            onTabClick = { index ->
+                                coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                            }
+                        )
+                    }
                 }
             }
         }
