@@ -114,10 +114,13 @@ object UpdateChecker {
         return withContext(Dispatchers.IO) {
             try {
                 val mainDoc = createJsoupConnection(url).get()
+                // Identify all version links - APKMirror uses a specific layout for versions
+                // We target links that are likely to be version rows and contain "APK" (ignoring Bundles for now as they are harder to parse/install)
                 val versionElements = mainDoc.select("#primary div.list-row a.fontBlack")
+                    .filter { it.text().contains("APK", ignoreCase = true) }
 
                 if (versionElements.isEmpty()) {
-                    Log.w("BadlockFetch", "No version links found for $url")
+                    Log.w("BadlockFetch", "No valid APK version links found for $url")
                     return@withContext VersionFetchResult()
                 }
 

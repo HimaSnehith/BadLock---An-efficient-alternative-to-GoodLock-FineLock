@@ -26,14 +26,15 @@ class ModuleRepository(private val context: Context, private val cacheManager: C
         val currentTime = System.currentTimeMillis()
         val installedThreshold = 3 * 24 * 60 * 60 * 1000L // 3 days for installed apps
 
+        // Optimization: Get all installed packages once to avoid repeated PM calls
+        val installedPackages = packageManager.getInstalledPackages(0).map { it.packageName }.toSet()
+
         return withContext(Dispatchers.IO) {
             try {
                 val allModules = coroutineScope {
                     GoodLockModules.modules.map { moduleInfo ->
                         async {
-                            val isInstalled = try {
-                                packageManager.getPackageInfo(moduleInfo.packageName, 0); true
-                            } catch (e: Exception) { false }
+                            val isInstalled = installedPackages.contains(moduleInfo.packageName)
 
                             val oldModule = oldModulesMap[moduleInfo.packageName]
 

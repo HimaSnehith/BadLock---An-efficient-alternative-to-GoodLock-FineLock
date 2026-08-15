@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +54,7 @@ fun MainScreen(viewModel: BadlockViewModel) {
     val searchResults by viewModel.searchResults.collectAsState()
 
     var selectedModule by remember { mutableStateOf<InstalledModule?>(null) }
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -159,13 +161,13 @@ fun MainScreen(viewModel: BadlockViewModel) {
         when (val state = moduleState) {
             is ModuleState.Loading -> {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    LargeHeader(
-                        title = "Badlock",
-                        subtitle = "Fetching updates...",
-                        onRefresh = {},
-                        refreshEnabled = false,
-                        searchQuery = searchQuery,
-                        onSearchQueryChange = { viewModel.updateSearchQuery(it) }
+                    // Pre-scaffold loading state to maintain header consistency
+                    LargeTopAppBar(
+                        title = { Text("Badlock", fontWeight = FontWeight.ExtraBold) },
+                        colors = TopAppBarDefaults.largeTopAppBarColors(
+                            containerColor = DarkBackground,
+                            titleContentColor = TextPrimary
+                        )
                     )
                     ShimmerModuleList()
                 }
@@ -180,19 +182,81 @@ fun MainScreen(viewModel: BadlockViewModel) {
                 val tabs = listOf("Make up", "Life up", "Updates")
                 val pagerState = rememberPagerState(pageCount = { tabs.size })
 
-                Column(modifier = Modifier.fillMaxSize()) {
-                    LargeHeader(
-                        title = "Badlock",
-                        subtitle = if (searchQuery.isNotEmpty()) "${searchResults.size} results found" 
-                                   else if (updatableModules.isNotEmpty()) "${updatableModules.size} updates available" 
-                                   else "Your modules are up to date",
-                        onRefresh = { viewModel.refreshData(force = true) },
-                        refreshEnabled = true,
-                        searchQuery = searchQuery,
-                        onSearchQueryChange = { viewModel.updateSearchQuery(it) }
-                    )
-
-                    Box(modifier = Modifier.weight(1f)) {
+                Scaffold(
+                    modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+                    topBar = {
+                        Column(modifier = Modifier.background(DarkBackground)) {
+                            LargeTopAppBar(
+                                title = {
+                                    Column {
+                                        Text(
+                                            "Badlock",
+                                            style = MaterialTheme.typography.headlineLarge,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = TextPrimary
+                                        )
+                                        if (scrollBehavior.state.collapsedFraction < 0.5f) {
+                                            Text(
+                                                text = if (searchQuery.isNotEmpty()) "${searchResults.size} results found"
+                                                else if (updatableModules.isNotEmpty()) "${updatableModules.size} updates available"
+                                                else "Your modules are up to date",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = if (updatableModules.isNotEmpty() && searchQuery.isEmpty()) UpdateYellow else TextSecondary,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                },
+                                actions = {
+                                    IconButton(
+                                        onClick = { viewModel.refreshData(force = true) },
+                                        enabled = true
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextSecondary)
+                                    }
+                                },
+                                scrollBehavior = scrollBehavior,
+                                colors = TopAppBarDefaults.largeTopAppBarColors(
+                                    containerColor = DarkBackground,
+                                    scrolledContainerColor = DarkSurface,
+                                    titleContentColor = TextPrimary
+                                )
+                            )
+                            
+                            // Search bar integrated into the header area
+                            Box(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+                                OutlinedTextField(
+                                    value = searchQuery,
+                                    onValueChange = { viewModel.updateSearchQuery(it) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(52.dp),
+                                    placeholder = { Text("Search modules...", color = TextSecondary.copy(alpha = 0.5f), fontSize = 14.sp) },
+                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
+                                    trailingIcon = {
+                                        if (searchQuery.isNotEmpty()) {
+                                            IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                                Icon(Icons.Default.Close, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                                            }
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = DarkSurface.copy(alpha = 0.5f),
+                                        unfocusedContainerColor = DarkSurface.copy(alpha = 0.3f),
+                                        focusedBorderColor = PrimaryAccent.copy(alpha = 0.5f),
+                                        unfocusedBorderColor = Color.White.copy(alpha = 0.05f),
+                                        cursorColor = PrimaryAccent
+                                    ),
+                                    singleLine = true,
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary)
+                                )
+                            }
+                        }
+                    },
+                    containerColor = DarkBackground
+                ) { innerPadding ->
+                    Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
                         if (searchQuery.isEmpty()) {
                             HorizontalPager(
                                 state = pagerState,
@@ -258,49 +322,23 @@ fun MainScreen(viewModel: BadlockViewModel) {
                             )
                         }
 
-                        // Top Fade Effect Overlay
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp)
-                                .align(Alignment.TopCenter)
-                                .background(
-                                    brush = Brush.verticalGradient(
-                                        colors = listOf(DarkBackground, Color.Transparent)
-                                    )
+                        // Bottom Island Navigation (Overlay)
+                        if (searchQuery.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = 40.dp)
+                            ) {
+                                BottomIsland(
+                                    tabs = tabs,
+                                    currentPage = pagerState.currentPage,
+                                    updatableCount = updatableModules.size,
+                                    onTabClick = { index ->
+                                        coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                                    }
                                 )
-                        )
-                    }
-                }
-
-                // Bottom Fade Effect
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, DarkBackground.copy(alpha = 0.5f), DarkBackground.copy(alpha = 0.9f))
-                            )
-                        )
-                )
-
-                // Bottom Island Navigation
-                if (searchQuery.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 40.dp)
-                    ) {
-                        BottomIsland(
-                            tabs = tabs,
-                            currentPage = pagerState.currentPage,
-                            updatableCount = updatableModules.size,
-                            onTabClick = { index ->
-                                coroutineScope.launch { pagerState.animateScrollToPage(index) }
                             }
-                        )
+                        }
                     }
                 }
             }
