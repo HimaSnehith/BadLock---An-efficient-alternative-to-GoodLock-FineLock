@@ -166,6 +166,7 @@ fun MainScreen(viewModel: BadlockViewModel) {
                         title = { Text("Badlock", fontWeight = FontWeight.ExtraBold) },
                         colors = TopAppBarDefaults.largeTopAppBarColors(
                             containerColor = DarkBackground,
+                            scrolledContainerColor = DarkBackground,
                             titleContentColor = TextPrimary
                         )
                     )
@@ -218,7 +219,7 @@ fun MainScreen(viewModel: BadlockViewModel) {
                                 scrollBehavior = scrollBehavior,
                                 colors = TopAppBarDefaults.largeTopAppBarColors(
                                     containerColor = DarkBackground,
-                                    scrolledContainerColor = DarkSurface,
+                                    scrolledContainerColor = DarkBackground,
                                     titleContentColor = TextPrimary
                                 )
                             )
