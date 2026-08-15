@@ -381,9 +381,9 @@ fun ShimmerModuleItem() {
             )
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Box(modifier = Modifier.width(120.dp).height(16.dp).shimmerEffect())
-                Spacer(Modifier.height(8.dp))
-                Box(modifier = Modifier.width(80.dp).height(12.dp).shimmerEffect())
+                Box(modifier = Modifier.width(140.dp).height(18.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                Spacer(Modifier.height(10.dp))
+                Box(modifier = Modifier.width(90.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
             }
         }
     }
@@ -585,20 +585,29 @@ fun InfoItem(
     }
 }
 
-fun Modifier.shimmerEffect(): Modifier = this.then(
-    Modifier.drawWithContent {
-        // We'll use a simpler pulse for now to avoid complex composed modifiers
-    }
-).composed {
+fun Modifier.shimmerEffect(): Modifier = composed {
+    var size by remember { mutableStateOf(IntSize.Zero) }
     val transition = rememberInfiniteTransition(label = "shimmer")
-    val alpha by transition.animateFloat(
-        initialValue = 0.05f,
-        targetValue = 0.15f,
+    val startOffsetX by transition.animateFloat(
+        initialValue = -2 * size.width.toFloat(),
+        targetValue = 2 * size.width.toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
+            animation = tween(1200, easing = FastOutSlowInEasing)
         ),
-        label = "alpha"
+        label = "shimmerOffset"
     )
-    background(Color.White.copy(alpha = alpha))
+
+    background(
+        brush = Brush.linearGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.05f),
+                Color.White.copy(alpha = 0.25f),
+                Color.White.copy(alpha = 0.05f),
+            ),
+            start = Offset(startOffsetX, 0f),
+            end = Offset(startOffsetX + size.width.toFloat(), size.height.toFloat())
+        )
+    ).onGloballyPositioned {
+        size = it.size
+    }
 }
