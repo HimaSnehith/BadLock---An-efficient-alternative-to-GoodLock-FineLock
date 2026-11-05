@@ -1,21 +1,17 @@
 package com.dark.badlock.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -49,7 +45,7 @@ import com.dark.badlock.logic.LaunchHelper
 import com.dark.badlock.logic.UpdateChecker
 import com.dark.badlock.ui.theme.*
 
-// One UI Tactile Spring Bounce Modifier
+// Hardware-Accelerated Press Scale Bounce Effect
 fun Modifier.bounceClick(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null
@@ -59,7 +55,7 @@ fun Modifier.bounceClick(
         targetValue = if (isPressed) 0.96f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            stiffness = Spring.StiffnessMedium
         ),
         label = "bounceScale"
     )
@@ -82,7 +78,7 @@ fun Modifier.bounceClick(
         }
 }
 
-// Samsung One UI Floating Bottom Navigation Dock
+// Samsung One UI Floating Bottom Navigation Dock with Bouncy Active Animations
 @Composable
 fun BottomIsland(
     tabs: List<String>,
@@ -99,7 +95,7 @@ fun BottomIsland(
         shape = RoundedCornerShape(32.dp),
         color = OneUiSlateLow.copy(alpha = 0.96f),
         border = BorderStroke(1.dp, OneUiBorder),
-        tonalElevation = 10.dp,
+        tonalElevation = 8.dp,
         shadowElevation = 16.dp
     ) {
         Row(
@@ -132,16 +128,16 @@ private fun BottomIslandTabItem(
 ) {
     val contentColor by animateColorAsState(
         if (isSelected) OneUiBlueLight else OneUiTextSecondary,
-        animationSpec = tween(200),
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
         label = "contentColor"
     )
     val backgroundColor by animateColorAsState(
         if (isSelected) OneUiBlueContainer.copy(alpha = 0.6f) else Color.Transparent,
-        animationSpec = tween(200),
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
         label = "backgroundColor"
     )
     val iconScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.12f else 1f,
+        targetValue = if (isSelected) 1.18f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
@@ -198,6 +194,7 @@ private fun BottomIslandTabItem(
     }
 }
 
+// Fluid, High-Performance Module List
 @Composable
 fun ModuleList(
     modules: List<InstalledModule>,
@@ -254,38 +251,21 @@ fun ModuleList(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            itemsIndexed(items = modules, key = { _, item -> item.packageName }) { index, module ->
-                var visible by remember { mutableStateOf(false) }
-                LaunchedEffect(module.packageName) {
-                    visible = true
-                }
-
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(animationSpec = tween(durationMillis = 250, delayMillis = (index * 25).coerceAtMost(250))) +
-                            slideInVertically(
-                                initialOffsetY = { it / 4 },
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessLow
-                                )
-                            )
-                ) {
-                    ModuleCard(
-                        module = module,
-                        onModuleClick = { onModuleClick(module) },
-                        onModuleLongClick = { onModuleLongClick(module) },
-                        onWebsiteClick = { onWebsiteClick(module.apkMirrorMainPage) },
-                        onUpdateClick = { onUpdateClick(module) },
-                        onAppInfoClick = { onAppInfoClick(module.packageName) }
-                    )
-                }
+            items(items = modules, key = { it.packageName }) { module ->
+                ModuleCard(
+                    module = module,
+                    onModuleClick = { onModuleClick(module) },
+                    onModuleLongClick = { onModuleLongClick(module) },
+                    onWebsiteClick = { onWebsiteClick(module.apkMirrorMainPage) },
+                    onUpdateClick = { onUpdateClick(module) },
+                    onAppInfoClick = { onAppInfoClick(module.packageName) }
+                )
             }
         }
     }
 }
 
-// Samsung One UI 6 Module Card Tile
+// Samsung One UI 6 Module Card Tile with Spring Bounce Feedback
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ModuleCard(
@@ -312,7 +292,7 @@ fun ModuleCard(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // One UI Squircle Icon Box (14dp rounded corners)
+            // One UI Squircle Icon Container
             Surface(
                 modifier = Modifier.size(50.dp),
                 shape = RoundedCornerShape(14.dp),
@@ -600,7 +580,6 @@ fun ModuleDetailsSheet(
                 .fillMaxWidth()
                 .padding(start = 24.dp, end = 24.dp, bottom = 36.dp, top = 4.dp)
         ) {
-            // Header
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     modifier = Modifier.size(60.dp),
@@ -662,7 +641,6 @@ fun ModuleDetailsSheet(
 
             Spacer(Modifier.height(18.dp))
 
-            // Info Grid
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 InfoItem(
                     label = "Installed",
@@ -719,7 +697,6 @@ fun ModuleDetailsSheet(
 
             Spacer(Modifier.height(24.dp))
 
-            // Actions
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (module.isInstalled) {
                     Button(
@@ -827,10 +804,11 @@ fun InfoItem(
 
 fun Modifier.shimmerEffect(): Modifier = composed {
     var size by remember { mutableStateOf(IntSize.Zero) }
+    val widthF = size.width.toFloat()
     val transition = rememberInfiniteTransition(label = "shimmer")
     val startOffsetX by transition.animateFloat(
-        initialValue = -2 * size.width.toFloat(),
-        targetValue = 2 * size.width.toFloat(),
+        initialValue = -2f * widthF,
+        targetValue = 2f * widthF,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = FastOutSlowInEasing)
         ),
@@ -848,7 +826,7 @@ fun Modifier.shimmerEffect(): Modifier = composed {
                 baseColor,
             ),
             start = Offset(startOffsetX, 0f),
-            end = Offset(startOffsetX + size.width.toFloat(), size.height.toFloat())
+            end = Offset(startOffsetX + widthF, size.height.toFloat())
         )
     ).onGloballyPositioned {
         size = it.size
