@@ -6,7 +6,8 @@ data class ModuleInfo(
     val name: String,
     val packageName: String,
     val category: String,
-    val apkMirrorMainPage: String
+    val apkMirrorMainPage: String,
+    val description: String = ""
 )
 
 data class InstalledModule(
@@ -23,7 +24,8 @@ data class InstalledModule(
     val category: String,
     val apkMirrorMainPage: String,
     val iconResId: Int?,
-    val lastChecked: Long = 0L
+    val lastChecked: Long = 0L,
+    val description: String = ""
 )
 
 data class AppUpdateInfo(

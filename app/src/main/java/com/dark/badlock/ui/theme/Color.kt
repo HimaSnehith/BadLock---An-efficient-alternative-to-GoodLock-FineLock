@@ -2,18 +2,33 @@ package com.dark.badlock.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val DarkBackground = Color(0xFF10121A)
-val DarkSurface = Color(0xFF1C1E28)
-val PrimaryAccent = Color(0xFF8A2BE2) // Electric Blue-Violet
-val GreenAccent = Color(0xFF00FFA3) // Neon Mint
-val UpdateYellow = Color(0xFFFFAB00) // Rich Gold
-val TextPrimary = Color.White.copy(alpha = 0.9f)
-val TextSecondary = Color.White.copy(alpha = 0.7f)
+// Samsung One UI 6 Dark Palette
+val OneUiDarkBg = Color(0xFF0F1117)
+val OneUiSlateLow = Color(0xFF161922)
+val OneUiSlateMedium = Color(0xFF1E222D)
+val OneUiSlateHigh = Color(0xFF272C38)
+val OneUiSlateHighest = Color(0xFF323846)
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+val OneUiBorder = Color(0xFF2A2F3D)
+val OneUiBorderSubtle = Color(0xFF1F232E)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+// Samsung One UI 6 Brand Accents
+val OneUiBlue = Color(0xFF3E82F7)
+val OneUiBlueContainer = Color(0xFF1D3B7A)
+val OneUiBlueLight = Color(0xFF70A6FF)
+
+val OneUiGreen = Color(0xFF10B981)
+val OneUiGreenContainer = Color(0xFF064E3B)
+
+val OneUiAmber = Color(0xFFF59E0B)
+val OneUiAmberContainer = Color(0xFF78350F)
+
+// Text
+val OneUiTextPrimary = Color(0xFFF3F4F6)
+val OneUiTextSecondary = Color(0xFF9CA3AF)
+val OneUiTextMuted = Color(0xFF6B7280)
+
+// Light Theme
+val OneUiLightBg = Color(0xFFF8FAFC)
+val OneUiLightCard = Color(0xFFFFFFFF)
+val OneUiLightBorder = Color(0xFFE2E8F0)

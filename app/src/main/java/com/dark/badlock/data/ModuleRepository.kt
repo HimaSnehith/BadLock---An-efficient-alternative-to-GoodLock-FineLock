@@ -99,7 +99,8 @@ class ModuleRepository(private val context: Context, private val cacheManager: C
                                 category = moduleInfo.category,
                                 apkMirrorMainPage = moduleInfo.apkMirrorMainPage,
                                 iconResId = iconResId,
-                                lastChecked = lastCheckedTime
+                                lastChecked = lastCheckedTime,
+                                description = moduleInfo.description
                             )
                         }
                     }.awaitAll()

@@ -16,14 +16,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -54,12 +53,10 @@ fun MainScreen(viewModel: BadlockViewModel) {
     val searchResults by viewModel.searchResults.collectAsState()
 
     var selectedModule by remember { mutableStateOf<InstalledModule?>(null) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                // The ViewModel handles the initial load and check thresholds
                 viewModel.refreshData()
             }
         }
@@ -91,27 +88,44 @@ fun MainScreen(viewModel: BadlockViewModel) {
     if (showUpdateDialog && appUpdateInfo != null) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissUpdateDialog() },
-            containerColor = DarkSurface,
-            titleContentColor = TextPrimary,
-            textContentColor = TextSecondary,
+            containerColor = OneUiDarkBg,
+            titleContentColor = OneUiTextPrimary,
+            textContentColor = OneUiTextSecondary,
+            icon = {
+                Icon(
+                    imageVector = Icons.Outlined.SystemUpdate,
+                    contentDescription = null,
+                    tint = OneUiBlue,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
             title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = PrimaryAccent)
-                    Spacer(Modifier.width(12.dp))
-                    Text("Badlock Update", fontWeight = FontWeight.Bold)
-                }
+                Text("Badlock Update Available", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             },
             text = {
                 Column {
-                    Text("A new version of Badlock is available!", fontWeight = FontWeight.Medium)
+                    Text("A new version of Badlock is ready to install!", style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
-                    Text("Version: v${appUpdateInfo!!.latestVersion}", color = UpdateYellow, fontWeight = FontWeight.Bold)
+                    Surface(
+                        color = OneUiAmberContainer.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            "Version: v${appUpdateInfo!!.latestVersion}",
+                            color = OneUiAmber,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                     if (!appUpdateInfo!!.releaseNotes.isNullOrBlank()) {
                         Spacer(Modifier.height(12.dp))
-                        Text("What's new:", fontSize = 12.sp, color = TextPrimary)
+                        Text("What's new:", style = MaterialTheme.typography.labelLarge, color = OneUiTextPrimary)
+                        Spacer(Modifier.height(4.dp))
                         Text(
                             appUpdateInfo!!.releaseNotes!!,
-                            fontSize = 11.sp,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OneUiTextSecondary,
                             maxLines = 5,
                             modifier = Modifier.verticalScroll(rememberScrollState())
                         )
@@ -124,17 +138,18 @@ fun MainScreen(viewModel: BadlockViewModel) {
                         LaunchHelper.openUrl(context, appUpdateInfo!!.downloadUrl)
                         viewModel.dismissUpdateDialog()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = OneUiBlue)
                 ) {
-                    Text("Go to GitHub", color = Color.White)
+                    Text("Download Update", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissUpdateDialog() }) {
-                    Text("Later", color = TextSecondary)
+                    Text("Later", color = OneUiTextSecondary)
                 }
             },
-            shape = RoundedCornerShape(28.dp)
+            shape = RoundedCornerShape(24.dp)
         )
     }
 
@@ -157,17 +172,26 @@ fun MainScreen(viewModel: BadlockViewModel) {
         )
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(DarkBackground)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(OneUiDarkBg)
+    ) {
         when (val state = moduleState) {
             is ModuleState.Loading -> {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Pre-scaffold loading state to maintain header consistency
-                    LargeTopAppBar(
-                        title = { Text("Badlock", fontWeight = FontWeight.ExtraBold) },
-                        colors = TopAppBarDefaults.largeTopAppBarColors(
-                            containerColor = DarkBackground,
-                            scrolledContainerColor = DarkBackground,
-                            titleContentColor = TextPrimary
+                    TopAppBar(
+                        title = {
+                            Text(
+                                "Badlock",
+                                style = MaterialTheme.typography.headlineLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = OneUiTextPrimary
+                            )
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = OneUiDarkBg,
+                            titleContentColor = OneUiTextPrimary
                         )
                     )
                     ShimmerModuleList()
@@ -184,100 +208,121 @@ fun MainScreen(viewModel: BadlockViewModel) {
                 val pagerState = rememberPagerState(pageCount = { tabs.size })
 
                 Scaffold(
-                    modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                     topBar = {
-                        Column(modifier = Modifier.background(DarkBackground)) {
-                            LargeTopAppBar(
+                        Column(modifier = Modifier.background(OneUiDarkBg)) {
+                            // Header Title & Subtitle
+                            TopAppBar(
                                 title = {
                                     Column {
                                         Text(
                                             "Badlock",
-                                            style = MaterialTheme.typography.headlineLarge,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = TextPrimary
+                                            style = MaterialTheme.typography.headlineMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = OneUiTextPrimary
                                         )
+                                        val subtitleText = if (searchQuery.isNotEmpty()) {
+                                            "${searchResults.size} modules found"
+                                        } else if (updatableModules.isNotEmpty()) {
+                                            "${updatableModules.size} update${if (updatableModules.size > 1) "s" else ""} available"
+                                        } else {
+                                            "All GoodLock modules up to date"
+                                        }
                                         Text(
-                                            text = if (searchQuery.isNotEmpty()) "${searchResults.size} results found"
-                                            else if (updatableModules.isNotEmpty()) "${updatableModules.size} updates available"
-                                            else "Your modules are up to date",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = if (updatableModules.isNotEmpty() && searchQuery.isEmpty()) UpdateYellow else TextSecondary,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.graphicsLayer {
-                                                // Smoothly fade out the subtitle as we scroll up
-                                                alpha = (1f - scrollBehavior.state.collapsedFraction * 2f).coerceIn(0f, 1f)
-                                            }
+                                            text = subtitleText,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (updatableModules.isNotEmpty() && searchQuery.isEmpty()) OneUiAmber else OneUiTextSecondary,
+                                            fontWeight = FontWeight.Medium
                                         )
                                     }
                                 },
                                 actions = {
                                     IconButton(
-                                        onClick = { viewModel.refreshData(force = true) },
-                                        enabled = true
+                                        onClick = { viewModel.refreshData(force = true) }
                                     ) {
-                                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextSecondary)
+                                        Icon(
+                                            Icons.Outlined.Refresh,
+                                            contentDescription = "Refresh",
+                                            tint = OneUiTextSecondary
+                                        )
                                     }
                                 },
-                                scrollBehavior = scrollBehavior,
-                                colors = TopAppBarDefaults.largeTopAppBarColors(
-                                    containerColor = DarkBackground,
-                                    scrolledContainerColor = DarkBackground,
-                                    titleContentColor = TextPrimary
+                                colors = TopAppBarDefaults.topAppBarColors(
+                                    containerColor = OneUiDarkBg,
+                                    titleContentColor = OneUiTextPrimary
                                 )
                             )
-                            
-                            // Search bar integrated into the header area
-                            Box(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+
+                            // One UI Search Field
+                            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
                                 OutlinedTextField(
                                     value = searchQuery,
                                     onValueChange = { viewModel.updateSearchQuery(it) },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(52.dp),
-                                    placeholder = { Text("Search modules...", color = TextSecondary.copy(alpha = 0.5f), fontSize = 14.sp) },
-                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
+                                        .height(50.dp),
+                                    placeholder = {
+                                        Text(
+                                            "Search GoodLock modules...",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = OneUiTextSecondary.copy(alpha = 0.6f)
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Outlined.Search,
+                                            contentDescription = null,
+                                            tint = OneUiTextSecondary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
                                     trailingIcon = {
                                         if (searchQuery.isNotEmpty()) {
                                             IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                                                Icon(Icons.Default.Close, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp))
+                                                Icon(
+                                                    Icons.Outlined.Close,
+                                                    contentDescription = "Clear search",
+                                                    tint = OneUiTextSecondary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
                                             }
                                         }
                                     },
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = RoundedCornerShape(24.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = DarkSurface.copy(alpha = 0.5f),
-                                        unfocusedContainerColor = DarkSurface.copy(alpha = 0.3f),
-                                        focusedBorderColor = PrimaryAccent.copy(alpha = 0.5f),
-                                        unfocusedBorderColor = Color.White.copy(alpha = 0.05f),
-                                        cursorColor = PrimaryAccent
+                                        focusedContainerColor = OneUiSlateLow,
+                                        unfocusedContainerColor = OneUiSlateLow,
+                                        focusedBorderColor = OneUiBlue,
+                                        unfocusedBorderColor = OneUiBorder,
+                                        cursorColor = OneUiBlue
                                     ),
                                     singleLine = true,
-                                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary)
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = OneUiTextPrimary)
                                 )
                             }
+
+                            Spacer(Modifier.height(8.dp))
                         }
                     },
-                    containerColor = DarkBackground
+                    containerColor = OneUiDarkBg
                 ) { innerPadding ->
                     Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
                         if (searchQuery.isEmpty()) {
                             HorizontalPager(
                                 state = pagerState,
                                 modifier = Modifier.fillMaxSize(),
-                                beyondBoundsPageCount = 1,
+                                beyondViewportPageCount = 1,
                                 verticalAlignment = Alignment.Top
                             ) { page ->
-                                Box(modifier = Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer {
-                                        // Move calculations here to avoid recomposition during pager swipes
-                                        val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
-                                        val fraction = 1f - abs(pageOffset).coerceIn(0f, 1f)
-                                        
-                                        alpha = fraction
-                                        scaleX = 0.95f + (0.05f * fraction)
-                                        scaleY = 0.95f + (0.05f * fraction)
-                                    }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .graphicsLayer {
+                                            val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                                            val fraction = 1f - abs(pageOffset).coerceIn(0f, 1f)
+                                            alpha = fraction
+                                            scaleX = 0.97f + (0.03f * fraction)
+                                            scaleY = 0.97f + (0.03f * fraction)
+                                        }
                                 ) {
                                     val pageTitle = tabs[page]
                                     val modulesToShow = when (pageTitle) {
@@ -300,13 +345,29 @@ fun MainScreen(viewModel: BadlockViewModel) {
                                     )
                                 }
                             }
+
+                            // Samsung One UI Floating Navigation Island
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = 16.dp)
+                            ) {
+                                BottomIsland(
+                                    tabs = tabs,
+                                    currentPage = pagerState.currentPage,
+                                    updatableCount = updatableModules.size,
+                                    onTabClick = { index ->
+                                        coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                                    }
+                                )
+                            }
                         } else {
                             ModuleList(
                                 modules = searchResults,
                                 showEmptyMessage = true,
-                                emptyTitle = "No Results",
-                                emptySubtitle = "We couldn't find any modules matching your search.",
-                                emptyIcon = Icons.Default.SearchOff,
+                                emptyTitle = "No Modules Found",
+                                emptySubtitle = "We couldn't find any GoodLock modules matching '$searchQuery'.",
+                                emptyIcon = Icons.Outlined.SearchOff,
                                 onModuleClick = { module ->
                                     val targetTab = tabs.indexOf(module.category)
                                     viewModel.updateSearchQuery("")
@@ -323,24 +384,6 @@ fun MainScreen(viewModel: BadlockViewModel) {
                                 onUpdateClick = { module -> module.latestVersionUrl?.let { LaunchHelper.openUrl(context, it) } },
                                 onAppInfoClick = { packageName -> LaunchHelper.openAppInfo(context, packageName) }
                             )
-                        }
-
-                        // Bottom Island Navigation (Overlay)
-                        if (searchQuery.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .padding(bottom = 40.dp)
-                            ) {
-                                BottomIsland(
-                                    tabs = tabs,
-                                    currentPage = pagerState.currentPage,
-                                    updatableCount = updatableModules.size,
-                                    onTabClick = { index ->
-                                        coroutineScope.launch { pagerState.animateScrollToPage(index) }
-                                    }
-                                )
-                            }
                         }
                     }
                 }
