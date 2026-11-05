@@ -1,0 +1,71 @@
+name: Build & Create Release Draft
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version Name (e.g. v3.2)'
+        required: true
+        default: 'v3.2'
+      release_notes:
+        description: 'Release Notes'
+        required: false
+        default: 'Badlock updates and Material 3 / One UI 6 visual enhancements.'
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-release:
+    name: Build & Create Release Draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Prepare Release APK Artifact
+        run: |
+          mkdir -p build-artifacts
+          VERSION_TAG="${{ inputs.version_name || github.ref_name }}"
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
+          
+          if [ -f "$APK_PATH" ]; then
+            cp "$APK_PATH" "build-artifacts/Badlock-${VERSION_TAG}.apk"
+            echo "APK prepared: build-artifacts/Badlock-${VERSION_TAG}.apk"
+          else
+            echo "ERROR: Release APK not found at $APK_PATH"
+            exit 1
+          fi
+
+      - name: Create GitHub Release Draft
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: false
+          name: "Badlock ${{ inputs.version_name || github.ref_name }}"
+          tag_name: "${{ inputs.version_name || github.ref_name }}"
+          body: "${{ inputs.release_notes || 'Automated release draft for Badlock.' }}"
+          files: |
+            build-artifacts/Badlock-*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
